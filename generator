@@ -1,0 +1,42 @@
+import boto3
+import pandas as pd
+from google.cloud import speech, translate_v2 as translate
+
+# Initialize clients
+speech_client = speech.SpeechClient()
+translate_client = translate.Client()
+s3 = boto3.client('s3')
+
+def transcribe_audio(audio_file):
+    """Transcribes audio file to text using Google Cloud Speech-to-Text."""
+    with open(audio_file, 'rb') as audio:
+        audio_content = audio.read()
+
+    audio = speech.RecognitionAudio(content=audio_content)
+    config = speech.RecognitionConfig(
+        encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+        language_code='en-US'
+    )
+
+    response = speech_client.recognize(config=config, audio=audio)
+    transcript = ' '.join([result.alternatives[0].transcript for result in response.results])
+    
+    return transcript
+
+def translate_text(text, target_language):
+    """Translates text to the target language using Google Cloud Translate."""
+    translation = translate_client.translate(text, target_language=target_language)
+    return translation['translatedText']
+
+def upload_subtitle_to_s3(subtitle_text, filename):
+    """Uploads the subtitle file to an S3 bucket."""
+    s3.put_object(Bucket='your-bucket-name', Key=filename, Body=subtitle_text)
+
+def generate_subtitles(audio_file, target_language):
+    """Generates subtitles for a given audio file in the target language."""
+    transcript = transcribe_audio(audio_file)
+    translated_text = translate_text(transcript, target_language)
+    upload_subtitle_to_s3(translated_text, f'subtitles/{audio_file.split("/")[-1].split(".")[0]}_{target_language}.txt')
+
+# Example usage
+generate_subtitles('path/to/audio/file.wav', 'es')  # Transcribe and translate to Spanish
